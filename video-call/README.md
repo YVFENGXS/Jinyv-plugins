@@ -1,10 +1,11 @@
 # Jinyv Video Call Adapter 插件
 
-视频通话服务适配层独立仓库（本地 `E:\Jinyv-plugins\video-call`）。
+单一插件仓库中的视频通话适配层（本地 `E:\Jinyv-plugins\video-call`）。
 
-- 服务原仓库：`https://github.com/YVFENGXS/jinyu-video-call`（保持不动）
+- 插件仓库：`https://github.com/YVFENGXS/jinyv-plugins`
+- 服务上游原仓库：`https://github.com/YVFENGXS/jinyu-video-call`（保持不动，不复制源码）
 - 本地服务克隆：`E:\rp_memory_project\jinyu-video-call`（只读检测，不修改）
-- 适配器仓库远程地址：**待确认**（建议 `https://github.com/YVFENGXS/Jinyv-plugin-video-call`）
+- 安装方式：服务仍从其上游仓库安装；本目录只提供适配层与桥接接口。
 
 ## 边界
 

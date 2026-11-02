@@ -61,6 +61,10 @@ class FeatureRegistry:
         self.bridge = bridge
         raw = bridge.status()
         modules = raw.get("modules") or {}
+        self._sources = {
+            name: str((modules.get(name) or {}).get("source") or "")
+            for name in CAPABILITY_ORDER
+        }
         self._items = [
             Capability(
                 name=name,
@@ -94,6 +98,7 @@ class FeatureRegistry:
                 "order": item.order,
                 "present": item.present,
                 "available": item.available,
+                "source": self._sources.get(item.name, ""),
             }
             for item in self._items
         ]

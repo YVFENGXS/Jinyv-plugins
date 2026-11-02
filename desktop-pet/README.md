@@ -1,11 +1,12 @@
 # Jinyv Desktop Pet Adapter 插件
 
-桌宠服务端适配层独立仓库（本地 `E:\Jinyv-plugins\desktop-pet`）。
+单一插件仓库中的桌宠服务端适配层（本地 `E:\Jinyv-plugins\desktop-pet`）。
 
-- 客户端原仓库：`https://github.com/YVFENGXS/Jinyu-pet`（保持不动）
+- 插件仓库：`https://github.com/YVFENGXS/jinyv-plugins`
+- 客户端上游原仓库：`https://github.com/YVFENGXS/Jinyu-pet`（保持不动，不复制源码）
 - 本地客户端克隆：`E:\rp_memory_project\rp-desktop-pet`（只读检测，不修改）
 - 协议真源：主仓库 `docs/protocol/desktop-v1.md`
-- 适配器仓库远程地址：**待确认**（建议 `https://github.com/YVFENGXS/Jinyv-plugin-desktop-pet`）
+- 安装方式：客户端仍从其上游仓库安装；本目录只提供服务端适配层。
 
 ## 边界
 

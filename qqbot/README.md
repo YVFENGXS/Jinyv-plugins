@@ -1,8 +1,8 @@
 # Jinyv QQBot 插件
 
-QQ 插件独立仓库（本地 `E:\Jinyv-plugins\qqbot`）。主仓库只保留契约、加载器与测试；本仓库提供 qqbot 适配实现。
+单一插件仓库中的 QQ 子目录（本地 `E:\Jinyv-plugins\qqbot`）。主仓库只保留契约、加载器与测试。
 
-- 远程地址：**待确认**（建议 `https://github.com/YVFENGXS/Jinyv-qqbot`）
+- 仓库地址：`https://github.com/YVFENGXS/jinyv-plugins`
 - 宿主契约：`jinyv_memory.contract`（主仓库）
 - 入口：`plugin.toml` + `__init__.py`
 
@@ -13,23 +13,20 @@ QQ 插件独立仓库（本地 `E:\Jinyv-plugins\qqbot`）。主仓库只保留�
 - 定时任务：`qqbot.heartbeat`
 - NoneBot2 可选；未安装时降级为工具/钩子
 
-## 旧能力迁移状态
+## 能力实现
 
-旧实现的 `richmsg / linkmeta / reminder / owner_gate / asr / bili_live / mcp_client / task_supervisor`
-以及 `__init__.py` 中的主动话题/命令/轮换，当前**没有复制进本仓库**。
-
-本仓库新增 `features/__init__.py`，按迁移顺序为每项能力提供**插件侧适配入口**：
+以下 8 个模块已复制到 `features/`，内部导入已改为包内相对导入：
 
 ```
-richmsg → linkmeta → reminder → owner_gate → asr → bili_live
+richmsg.py  linkmeta.py  bili_live.py  reminder.py
+owner_gate.py  asr.py  mcp_client.py  task_supervisor.py
 ```
 
-适配入口通过 `legacy_bridge.py` 只读调用旧包目录，不复制源码：
+- `linkmeta → .richmsg`、`linkmeta → .bili_live`、`asr → .richmsg` 已改写。
+- 不再依赖 `E:\rp_memory_project`；`legacy_source_dir` 仅作为旧入口回退。
+- 可选依赖见 `requirements.txt`（nonebot2 / nonebot-adapter-onebot / httpx）。
+  缺依赖时对应能力不可用，不影响最小消息闭环。
+- `reminder` 与 `owner_gate` 已有 unittest 覆盖（建表、排提醒、认领、绑定验证）。
 
-```toml
-# config/plugins/qqbot.toml（主仓库）
-legacy_source_dir = "E:/rp_memory_project/jinyu-memory/jinyu_memory"
-```
-
-- 旧模块的第三方依赖缺失时，该能力保持不可用并降级，不影响 qqbot 最小闭环。
-- 真正「新建 + 改写」的物理迁移仍待逐模块评审；当前避免两份实现与单一真源漂移。
+旧 `__init__.py` 中的主动话题/命令/轮换（`legacy_entry`）尚未复制；
+如需启用，把 `legacy_source_dir` 指向旧包目录作为回退。
