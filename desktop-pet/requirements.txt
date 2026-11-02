@@ -1,0 +1,4 @@
+# 桌宠 desktop-v1 可选服务依赖
+fastapi>=0.110
+uvicorn>=0.27
+websockets>=12

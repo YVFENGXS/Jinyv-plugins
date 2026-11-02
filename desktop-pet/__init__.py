@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import threading
 from pathlib import Path
 from typing import Any
 
 from jinyv_memory.contract import Health, PluginContext, ToolSpec, TurnContext
+
+from .protocol import new_id, now_ms
 
 
 def create_plugin() -> "DesktopPetPlugin":
@@ -34,8 +37,15 @@ class DesktopPetPlugin:
         self.ctx = ctx
         self.account = str(ctx.config.get("account") or "desktop")
         self.service_url = str(ctx.config.get("service_url") or "")
+        self.host = str(ctx.config.get("host") or "127.0.0.1")
+        self.port = int(ctx.config.get("port") or 8787)
+        self.token = ctx.config.secret("token", env_var="JINYV_DESKTOP_TOKEN")
         self.serve = bool(ctx.config.get("serve", False))
         self.connected = False
+        self.session_id = ctx.accounts.get(self.account).session_id
+        self.pending_say: list[str] = []
+        self._server = None
+        self._thread: threading.Thread | None = None
         ctx.tools.register(ToolSpec(
             name="desktop.status",
             description="查看桌宠适配层与客户端连接状态。",
@@ -54,11 +64,30 @@ class DesktopPetPlugin:
         ), ctx.plugin_id)
 
     def start(self, ctx: PluginContext) -> None:
-        missing = [name for name in ("fastapi", "uvicorn", "websockets") if not _has_module(name)]
-        client_dir = str(ctx.config.get("client_dir") or os.environ.get("JINYV_DESKTOP_PET_DIR") or "")
-        if missing and self.serve:
-            ctx.degrade(f"desktop-v1 依赖缺失：{', '.join(missing)}")
+        missing = [name for name in ("fastapi", "uvicorn", "websockets")
+                   if not _has_module(name)]
+        if self.serve:
+            if missing:
+                ctx.degrade(f"desktop-v1 依赖缺失：{', '.join(missing)}")
+                return
+            if not self.token:
+                ctx.degrade("缺少 JINYV_DESKTOP_TOKEN，未启动 desktop-v1 服务")
+                return
+            from .server import create_app
+
+            import uvicorn
+
+            app = create_app(self, ctx)
+            config = uvicorn.Config(app, host=self.host, port=self.port,
+                                    log_level="info")
+            self._server = uvicorn.Server(config)
+            self._thread = threading.Thread(target=self._server.run, daemon=True,
+                                            name="jinyv-desktop-ws")
+            self._thread.start()
+            ctx.logger.info("desktop-v1 服务已启动 ws://%s:%s", self.host, self.port)
             return
+        client_dir = str(ctx.config.get("client_dir")
+                         or os.environ.get("JINYV_DESKTOP_PET_DIR") or "")
         if not client_dir:
             ctx.degrade(f"未配置客户端目录；客户端请独立安装 {self.CLIENT_REPO}")
             return
@@ -66,6 +95,23 @@ class DesktopPetPlugin:
             ctx.degrade(f"客户端目录不存在：{client_dir}")
             return
         ctx.logger.info("桌宠适配层就绪：client_dir=%s", client_dir)
+
+    def stop(self, ctx: PluginContext) -> None:
+        if self._server is not None:
+            self._server.should_exit = True
+            if self._thread is not None:
+                self._thread.join(timeout=5)
+            self._server = None
+            self._thread = None
+        self.connected = False
+
+    @staticmethod
+    def new_device_id() -> str:
+        return new_id()[:12]
+
+    @staticmethod
+    def now_ms() -> int:
+        return now_ms()
 
     def health(self, ctx: PluginContext) -> Health:
         if ctx.degraded_reason:
@@ -97,6 +143,9 @@ class DesktopPetPlugin:
             "connected": self.connected,
             "service_url": self.service_url,
             "account": self.account,
+            "serve": self.serve,
+            "running": bool(self._server),
+            "pending_say": len(self.pending_say),
             "degraded": self.ctx.degraded_reason,
         }
 
@@ -104,6 +153,7 @@ class DesktopPetPlugin:
         text = str((args or {}).get("text") or "").strip()
         if not text:
             return {"ok": False, "error": "text 不能为空"}
-        # 推送通道尚未落地：明确返回未连接，避免假装成功
-        return {"ok": False, "queued": False,
-                "error": "desktop-v1 推送通道本轮未实现" if not self.connected else "设备未订阅"}
+        if not (self.connected or self._server is not None):
+            return {"ok": False, "queued": False, "error": "desktop-v1 服务未启动或设备未连接"}
+        self.pending_say.append(text)
+        return {"ok": True, "queued": True}

@@ -1,0 +1,9 @@
+[plugin]
+id = "host-api"
+name = "Host HTTP API"
+version = "0.1.0"
+kind = "adapter"
+entry = "__init__.py"
+description = "零依赖宿主 HTTP API：/chat /remember /recall，给桌宠、通话与 DSH 写入。"
+optional_modules = []
+provides = ["api.host"]

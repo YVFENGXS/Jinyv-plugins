@@ -16,6 +16,8 @@ from typing import Any
 
 from jinyv_memory.contract import Health, PluginContext, ToolSpec, TurnContext
 
+from .bridge import CallBridge
+
 
 def create_plugin() -> "VideoCallPlugin":
     return VideoCallPlugin()
@@ -35,6 +37,8 @@ class VideoCallPlugin:
         self.ctx = ctx
         self.account = str(ctx.config.get("account") or "video_call")
         self.service_url = str(ctx.config.get("service_url") or "")
+        self.token = ctx.config.secret("token", env_var="JINYV_VIDEO_CALL_TOKEN")
+        self.bridge = CallBridge(self.service_url, self.token)
         self.repo_dir = ""
         self.serve = bool(ctx.config.get("serve", False))
         ctx.tools.register(ToolSpec(
@@ -52,6 +56,19 @@ class VideoCallPlugin:
                 "required": ["text"],
             },
             handler=self._tool_say,
+        ), ctx.plugin_id)
+        ctx.tools.register(ToolSpec(
+            name="video_call.turn",
+            description="把一句话发给通话服务，返回通话回复并写入共享记忆。",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string"},
+                    "session": {"type": "string"},
+                },
+                "required": ["text"],
+            },
+            handler=self._tool_turn,
         ), ctx.plugin_id)
 
     def start(self, ctx: PluginContext) -> None:
@@ -100,5 +117,21 @@ class VideoCallPlugin:
         text = str((args or {}).get("text") or "").strip()
         if not text:
             return {"ok": False, "error": "text 不能为空"}
-        return {"ok": False, "queued": False,
-                "error": "视频通话跨窗口发话本轮未实现"}
+        return self.bridge.say(
+            text,
+            session=str((args or {}).get("session") or ""),
+            source="jinyv",
+        )
+
+    def _tool_turn(self, args: Any, turn: TurnContext | None) -> dict:
+        text = str((args or {}).get("text") or "").strip()
+        if not text:
+            return {"ok": False, "error": "text 不能为空"}
+        result = self.bridge.turn(
+            text,
+            session=str((args or {}).get("session") or ""),
+        )
+        reply = str(result.get("reply") or "").strip()
+        if reply:
+            self.record_turn(text, reply)
+        return result

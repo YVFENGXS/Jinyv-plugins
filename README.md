@@ -5,9 +5,10 @@
 
 ```
 Jinyv-plugins/
-├── qqbot/          # QQ 适配层 + features 能力入口（旧源码只读桥接）
-├── desktop-pet/    # 桌宠服务端适配层
-└── video-call/     # 视频通话适配层
+├── qqbot/          # QQ 适配层 + features 能力入口
+├── desktop-pet/    # 桌宠 desktop-v1 服务端适配层
+├── video-call/     # 视频通话适配层 + HTTP 桥
+└── host-api/       # 宿主 HTTP API（/chat /remember /recall）
 ```
 
 ## 上游引用
@@ -16,8 +17,9 @@ Jinyv-plugins/
 |---|---|---|
 | desktop-pet | https://github.com/YVFENGXS/Jinyu-pet | 客户端独立仓库；本目录只放服务端适配层，不复制客户端源码 |
 | video-call | https://github.com/YVFENGXS/jinyu-video-call | 服务独立仓库；本目录只放适配层，不复制服务源码 |
-| qqbot | 主仓库旧实现只读引用 | `legacy_bridge.py` 通过 `legacy_source_dir` 只读调用；不复制旧源码 |
+| qqbot | 主仓库旧实现已迁入 `features/` | 8 个能力模块已复制并改写导入；旧目录仅作 `legacy_entry` 回退 |
 | dsh | 用户 zip / `$DSH_HOME/plugins/jinyu-memory-dsh` | 特殊接入，不进入本仓库 |
+| host-api | 无上游 | 主仓库与外部进程共用的 HTTP 写入通道 |
 
 ## 远程
 
