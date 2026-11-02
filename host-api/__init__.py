@@ -4,9 +4,10 @@
 零第三方依赖，使用 stdlib ThreadingHTTPServer。
 端点：
   GET  /health
-  POST /chat     {"text","session","account"} -> {"reply","session"}
-  POST /remember {"text","speaker","importance","account"} -> {"ok","id"}
-  GET  /recall?q=&limit=&account= -> {"cards","facts","text"}
+  POST /chat     {"text","session","account","speaker","source","store_reply"}
+                 -> {"reply","session"}
+  POST /remember {"text","speaker","importance","account","session"} -> {"ok","id"}
+  GET  /recall?q=&limit=&account=&session=&speaker= -> {"cards","facts","text"}
 除 /health 外都要求 Authorization: Bearer <token>。
 """
 from __future__ import annotations
@@ -95,7 +96,13 @@ class HostAPIPlugin:
             return 413, {"error": "text too long"}
         session = str(payload.get("session") or "").strip()
         lane = self._lane(session, str(payload.get("account") or ""))
-        reply = self.ctx.memory.chat(lane, text, source="host-api")
+        speaker = str(payload.get("speaker") or "")[:80]
+        source = str(payload.get("source") or "host-api")[:40]
+        store_reply = str(payload.get("store_reply") or "").strip()
+        reply = self.ctx.memory.chat(
+            lane, text, speaker=speaker, source=source,
+            store_reply=(lambda _generated: store_reply) if store_reply else None,
+        )
         return 200, {"reply": reply, "session": lane.session_id}
 
     def handle_remember(self, payload: dict) -> tuple[int, dict]:
@@ -107,7 +114,8 @@ class HostAPIPlugin:
             importance = max(0.0, min(1.0, float(payload.get("importance") or 0.7)))
         except (TypeError, ValueError):
             importance = 0.7
-        lane = self._lane("", str(payload.get("account") or ""))
+        lane = self._lane(str(payload.get("session") or "").strip(),
+                          str(payload.get("account") or ""))
         fact_id = self.ctx.memory.remember(lane, text, speaker=speaker,
                                            importance=importance)
         return 200, {"ok": bool(fact_id), "id": fact_id}
@@ -119,7 +127,10 @@ class HostAPIPlugin:
         except ValueError:
             limit = 6
         account = str((params.get("account") or [""])[0])
-        result = self.ctx.memory.recall(self._lane("", account), query, limit=limit)
+        session = str((params.get("session") or [""])[0]).strip()
+        speaker = str((params.get("speaker") or [""])[0])[:80]
+        result = self.ctx.memory.recall(self._lane(session, account), query,
+                                        limit=limit, speaker=speaker)
         return 200, result.to_dict()
 
 

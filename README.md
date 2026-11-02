@@ -21,13 +21,25 @@ Jinyv-plugins/
 | dsh | 用户 zip / `$DSH_HOME/plugins/jinyu-memory-dsh` | 特殊接入，不进入本仓库 |
 | host-api | 无上游 | 主仓库与外部进程共用的 HTTP 写入通道 |
 
+## 记忆核心接入
+
+`desktop-pet` 与 `video-call` 都支持 `core_mode`：
+
+| 模式 | 说明 |
+|---|---|
+| `embedded` | 与核心同进程，直接使用 `MemoryAPI`（默认） |
+| `local` | 连本机宿主 API `http://127.0.0.1:8710` |
+| `server` | 连配置的远程 `core_url` |
+
+桌宠还可独立运行 `python desktop-pet/standalone.py --core-url ...`，
+不要求核心进程加载本插件。
+
 ## 远程
 
-目标远程：`https://github.com/YVFENGXS/jinyv-plugins`（创建后执行）：
+远程已创建并推送 `main`：`https://github.com/YVFENGXS/jinyv-plugins`
 
 ```powershell
-git -C E:\Jinyv-plugins remote add origin https://github.com/YVFENGXS/jinyv-plugins.git
-git -C E:\Jinyv-plugins push -u origin main
+git -C E:\Jinyv-plugins push origin main
 ```
 
 ## 历史

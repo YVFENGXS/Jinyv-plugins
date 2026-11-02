@@ -10,13 +10,16 @@
 ## 边界
 
 - 不复制 Live2D 舞台、ASR/TTS、画面判读代码。
-- 推荐通话服务只走宿主 API（`RP_HOST_BASE` + `RP_HOST_TOKEN`），禁止与主进程双写 SQLite。
-- 本轮提供 `memory_context` / `record_turn` 与健康检查；服务联调在下一阶段。
+- 不直连 SQLite：`embedded` 走 `MemoryAPI`，`local`/`server` 走宿主 HTTP API。
+- 提供 `memory_context` / `record_turn`；通话回复通过 `store_reply` 原样落库。
+- 通话服务自身可本地或远程：配置 `service_url` 即可，桥接走 stdlib `urllib`。
 
 ## 配置（主仓库 `config/plugins/video-call.toml`）
 
 ```toml
 repo_dir = ""  # 例如 E:/rp_memory_project/jinyu-video-call
-service_url = "http://127.0.0.1:8790"
+service_url = "http://127.0.0.1:8790"  # 也可填远程通话服务
 account = "video_call"
+core_mode = "embedded"  # embedded | local | server
+core_url = ""           # local 默认 http://127.0.0.1:8710；server 必填
 ```

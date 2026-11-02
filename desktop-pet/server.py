@@ -12,7 +12,10 @@ import asyncio
 import json
 from typing import Any
 
-from .protocol import actions_for, envelope, split_bubbles, take_tags
+try:
+    from .protocol import actions_for, envelope, split_bubbles, take_tags
+except ImportError:  # standalone.py 以脚本方式启动时没有包上下文
+    from protocol import actions_for, envelope, split_bubbles, take_tags
 
 
 def create_app(plugin: Any, ctx: Any):
@@ -31,6 +34,9 @@ def create_app(plugin: Any, ctx: Any):
         return JSONResponse({
             "ok": True, "protocol": "desktop-v1", "mode": "adapter",
             "connected": plugin.connected,
+            "core_mode": getattr(plugin, "core_mode", "embedded"),
+            "core_url": getattr(plugin, "core_url", ""),
+            "core_ok": bool(getattr(plugin, "core_ok", True)),
         })
 
     @app.post("/desktop/v1/say")

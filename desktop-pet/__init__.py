@@ -16,7 +16,10 @@ from typing import Any
 
 from jinyv_memory.contract import Health, PluginContext, ToolSpec, TurnContext
 
+from .core_client import CoreClient
 from .protocol import new_id, now_ms
+
+CORE_MODES = ("embedded", "local", "server")
 
 
 def create_plugin() -> "DesktopPetPlugin":
@@ -37,12 +40,22 @@ class DesktopPetPlugin:
         self.ctx = ctx
         self.account = str(ctx.config.get("account") or "desktop")
         self.service_url = str(ctx.config.get("service_url") or "")
+        self.core_mode = str(ctx.config.get("core_mode") or "embedded").lower()
+        if self.core_mode not in CORE_MODES:
+            ctx.logger.warning("未知 core_mode=%s，回退 embedded", self.core_mode)
+            self.core_mode = "embedded"
+        default_core = "http://127.0.0.1:8710" if self.core_mode == "local" else ""
+        self.core_url = str(ctx.config.get("core_url") or default_core)
+        self.core_token = ctx.config.secret("core_token", env_var="JINYV_HOST_API_TOKEN")
+        self.core_ok = self.core_mode == "embedded"
         self.host = str(ctx.config.get("host") or "127.0.0.1")
         self.port = int(ctx.config.get("port") or 8787)
         self.token = ctx.config.secret("token", env_var="JINYV_DESKTOP_TOKEN")
         self.serve = bool(ctx.config.get("serve", False))
         self.connected = False
         self.session_id = ctx.accounts.get(self.account).session_id
+        self.core = CoreClient(self.core_url, self.core_token, account=self.account,
+                               session=self.session_id)
         self.pending_say: list[str] = []
         self._server = None
         self._thread: threading.Thread | None = None
@@ -64,6 +77,20 @@ class DesktopPetPlugin:
         ), ctx.plugin_id)
 
     def start(self, ctx: PluginContext) -> None:
+        if self.core_mode != "embedded":
+            if not self.core_url:
+                ctx.degrade(f"core_mode={self.core_mode} 但未配置 core_url")
+                return
+            if not self.core_token:
+                ctx.degrade("缺少 core_token / JINYV_HOST_API_TOKEN")
+                return
+            probe = self.core.health()
+            self.core_ok = bool(probe.get("ok"))
+            if self.core_ok:
+                ctx.logger.info("桌宠已连接记忆核心 %s（%s）", self.core_url, self.core_mode)
+            else:
+                ctx.logger.warning("记忆核心暂不可达 %s: %s", self.core_url,
+                                   probe.get("error") or probe.get("status"))
         missing = [name for name in ("fastapi", "uvicorn", "websockets")
                    if not _has_module(name)]
         if self.serve:
@@ -116,9 +143,11 @@ class DesktopPetPlugin:
     def health(self, ctx: PluginContext) -> Health:
         if ctx.degraded_reason:
             return Health.degraded(ctx.degraded_reason, connected=self.connected,
-                                   service_url=self.service_url)
+                                   service_url=self.service_url,
+                                   core_mode=self.core_mode, core_url=self.core_url)
         return Health.ok(connected=self.connected, service_url=self.service_url,
-                         account=self.account)
+                         account=self.account, core_mode=self.core_mode,
+                         core_url=self.core_url, core_ok=self.core_ok)
 
     # ------------------------------------------------------------ 协议入口
     def handle_hello(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -133,6 +162,13 @@ class DesktopPetPlugin:
 
     def handle_text(self, text: str, *, speaker: str = "") -> str:
         """设备上行文字 → 核心一轮对话；与 QQ 共享同一条 lane 记忆。"""
+        if self.core_mode != "embedded":
+            result = self.core.chat(text, speaker=speaker, source="desktop")
+            self.core_ok = bool(result.get("ok"))
+            if not self.core_ok:
+                self.ctx.logger.warning("桌宠写入记忆核心失败: %s",
+                                        result.get("error") or result.get("status"))
+            return str(result.get("reply") or "")
         lane = self.ctx.accounts.get(self.account)
         return self.ctx.memory.chat(lane, text, speaker=speaker, source="desktop")
 
@@ -145,6 +181,9 @@ class DesktopPetPlugin:
             "account": self.account,
             "serve": self.serve,
             "running": bool(self._server),
+            "core_mode": self.core_mode,
+            "core_url": self.core_url,
+            "core_ok": self.core_ok,
             "pending_say": len(self.pending_say),
             "degraded": self.ctx.degraded_reason,
         }

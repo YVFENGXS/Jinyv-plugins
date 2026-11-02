@@ -15,8 +15,9 @@ token = ""   # 或用环境变量 JINYV_HOST_API_TOKEN
 ## 端点
 
 - `GET /health`
-- `POST /chat` `{"text","session","account"}` → `{"reply","session"}`
-- `POST /remember` `{"text","speaker","importance","account"}` → `{"ok","id"}`
-- `GET /recall?q=&limit=&account=` → 召回结果
+- `POST /chat` `{"text","session","account","speaker","source","store_reply"}` → `{"reply","session"}`
+  - `store_reply`：用给定原文覆盖生成的回复落库（通话场景）
+- `POST /remember` `{"text","speaker","importance","account","session"}` → `{"ok","id"}`
+- `GET /recall?q=&limit=&account=&session=&speaker=` → 召回结果
 
 除 `/health` 外都需要 `Authorization: Bearer <token>`。
