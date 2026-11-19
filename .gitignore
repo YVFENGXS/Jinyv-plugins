@@ -1,0 +1,7 @@
+.repo-history/
+**/__pycache__/
+**/*.py[cod]
+var/
+secrets/
+.tmp/
+*.log
