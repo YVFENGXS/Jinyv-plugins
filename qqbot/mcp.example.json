@@ -1,0 +1,34 @@
+{
+  "servers": {
+    "fetch": {
+      "command": "/opt/qqbot/bot/.venv/bin/python",
+      "args": [
+        "-m",
+        "mcp_server_fetch"
+      ],
+      "tools": [
+        "fetch"
+      ],
+      "timeout": 10
+    },
+    "search": {
+      "command": "/opt/qqbot/mcp-search/.venv/bin/python",
+      "args": [
+        "-m",
+        "search_mcp"
+      ],
+      "env": {
+        "SEARCH_MCP_DEFAULT_ENGINES": "[\"so360\"]",
+        "SEARCH_MCP_REGION": "cn",
+        "SEARCH_MCP_CACHE_DIR": "/opt/qqbot/data/search_cache",
+        "PLAYWRIGHT_BROWSERS_PATH": "/opt/qqbot/ms-playwright"
+      },
+      "tools": [
+        "search",
+        "research",
+        "fetch"
+      ],
+      "timeout": 90
+    }
+  }
+}

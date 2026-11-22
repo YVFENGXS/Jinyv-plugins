@@ -1,33 +1,43 @@
-# Jinyv Desktop Pet Adapter 插件
+# Desktop Pet Adapter
 
-单一插件仓库中的桌宠服务端适配层（本地 `E:\Jinyv-plugins\desktop-pet`）。
-
-- 插件仓库：`https://github.com/YVFENGXS/jinyv-plugins`
-- 客户端上游原仓库：`https://github.com/YVFENGXS/Jinyu-pet`（保持不动，不复制源码）
-- 本地客户端克隆：`E:\rp_memory_project\rp-desktop-pet`（只读检测，不修改）
-- 协议真源：主仓库 `docs/protocol/desktop-v1.md`
-- 安装方式：客户端仍从其上游仓库安装；本目录只提供服务端适配层。
+桌宠的**服务端适配层**。客户端源码在独立仓库
+**[Jinyu-pet](https://github.com/YVFENGXS/Jinyu-pet)**，本目录不复制 Electron /
+WebGL / Live2D 资产。
 
 ## 边界
 
-- 不复制 Electron / WebGL / Live2D 资产；只提供 desktop-v1 服务端入口。
-- 不直连 SQLite：`embedded` 走 `MemoryAPI`，`local`/`server` 走宿主 HTTP API。
+- 不直连 SQLite：一律通过宿主 HTTP API（[host-api](../host-api)）读写记忆。
 - 提供 `/desktop/v1/health`、`/desktop/v1/say`、`/desktop/v1/ws`。
-- 可独立进程运行 `standalone.py`，连本机或远程记忆核心。
+- 上行文字 → 宿主 `/chat`；下行气泡 / 动作标记走 desktop-v1 协议。
+- 可独立进程运行，不要求与 QQ 插件同进程。
 
-## 配置（主仓库 `config/plugins/desktop-pet.toml`）
+## 运行
 
-```toml
-client_dir = ""  # 例如 E:/rp_memory_project/rp-desktop-pet
-account = "desktop"
-serve = false
-core_mode = "embedded"  # embedded | local | server
-core_url = ""           # local 默认 http://127.0.0.1:8710；server 必填
-```
-
-独立运行：
+先启动记忆宿主：
 
 ```bash
-JINYV_DESKTOP_TOKEN=... JINYV_HOST_API_TOKEN=... \
-python standalone.py --core-url http://127.0.0.1:8710
+export RP_HOST_TOKEN=<随机串>
+python host-api/__init__.py --port 8710 --db /opt/qqbot/data/rp_memory.db
 ```
+
+再启动适配层：
+
+```bash
+export JINYV_DESKTOP_TOKEN=<桌宠令牌>
+export JINYV_HOST_API_TOKEN="$RP_HOST_TOKEN"
+python standalone.py --core-url http://127.0.0.1:8710 --port 8787
+```
+
+依赖：`fastapi`、`uvicorn`、`websockets`。
+
+协议文档：[docs/desktop-v1.md](docs/desktop-v1.md)。
+
+## 文件
+
+| 文件 | 作用 |
+|---|---|
+| `standalone.py` | 独立启动入口（uvicorn） |
+| `server.py` | FastAPI 路由与 WebSocket |
+| `protocol.py` | desktop-v1 信封 / 气泡拆分 / 动作提取 |
+| `core_client.py` | 宿主 HTTP 客户端（stdlib urllib） |
+| `install_desktop_adapter.sh` | 服务器 systemd 安装脚本 |

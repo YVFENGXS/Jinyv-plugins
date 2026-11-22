@@ -1,25 +1,32 @@
-# Jinyv Video Call Adapter 插件
+# Video Call Adapter
 
-单一插件仓库中的视频通话适配层（本地 `E:\Jinyv-plugins\video-call`）。
-
-- 插件仓库：`https://github.com/YVFENGXS/jinyv-plugins`
-- 服务上游原仓库：`https://github.com/YVFENGXS/jinyu-video-call`（保持不动，不复制源码）
-- 本地服务克隆：`E:\rp_memory_project\jinyu-video-call`（只读检测，不修改）
-- 安装方式：服务仍从其上游仓库安装；本目录只提供适配层与桥接接口。
+视频通话的**记忆适配层**。服务源码在独立仓库
+**[jinyu-video-call](https://github.com/YVFENGXS/jinyu-video-call)**，本目录不复制
+Live2D 舞台、ASR/TTS 或画面判读代码。
 
 ## 边界
 
-- 不复制 Live2D 舞台、ASR/TTS、画面判读代码。
-- 不直连 SQLite：`embedded` 走 `MemoryAPI`，`local`/`server` 走宿主 HTTP API。
-- 提供 `memory_context` / `record_turn`；通话回复通过 `store_reply` 原样落库。
-- 通话服务自身可本地或远程：配置 `service_url` 即可，桥接走 stdlib `urllib`。
+- 不直连 SQLite：通过宿主 HTTP API（[host-api](../host-api)）读写记忆。
+- `bridge.py` 调通话服务公开端点：`/health`、`/call/turn`、`/call/say`。
+- `core_client.py` 调记忆宿主：`/chat`、`/recall`。
+- 通话产生的一轮用 `store_reply` 原样落库，避免二次生成。
 
-## 配置（主仓库 `config/plugins/video-call.toml`）
+## 用法
 
-```toml
-repo_dir = ""  # 例如 E:/rp_memory_project/jinyu-video-call
-service_url = "http://127.0.0.1:8790"  # 也可填远程通话服务
-account = "video_call"
-core_mode = "embedded"  # embedded | local | server
-core_url = ""           # local 默认 http://127.0.0.1:8710；server 必填
+```python
+from bridge import CallBridge
+from core_client import CoreClient
+
+core = CoreClient("http://127.0.0.1:8710", token=os.environ["RP_HOST_TOKEN"],
+                  session="qq-u123")
+call = CallBridge("http://127.0.0.1:8790")
 ```
+
+启动记忆宿主：
+
+```bash
+export RP_HOST_TOKEN=<随机串>
+python host-api/__init__.py --port 8710 --db /opt/qqbot/data/rp_memory.db
+```
+
+本目录是库，不是可独立运行的 NoneBot 插件。

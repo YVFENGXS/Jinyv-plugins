@@ -9,7 +9,7 @@
 环境变量：
   RP_BILI_ROOM      直播间号（也支持在聊天里 /bili room 设置）
   RP_BILI_ON        1/0 开关，默认 1（配了房间且有登录态才真正连）
-  RP_BILI_NAMES     触发词，逗号分隔，默认「jinyu」
+  RP_BILI_NAMES     触发词，逗号分隔，默认「瑾瑜,jinyu」
   RP_BILI_GAP       两条弹幕最小间隔秒数，默认 20
   RP_BILI_DAILY     每天最多发几条，默认 60
   RP_BILI_CMT_DAILY 每天最多发几条视频评论，默认 3（0=不发）
@@ -84,6 +84,9 @@ def init(path, room: str = "", owner_uid: str = "", owner_name: str = "") -> Non
         "sent": int(data.get("sent") or 0),
         "cmt_day": str(data.get("cmt_day") or ""),
         "cmt_sent": int(data.get("cmt_sent") or 0),
+        "at_day": str(data.get("at_day") or ""),
+        "at_sent": int(data.get("at_sent") or 0),
+        "at_seen": int(data.get("at_seen") or 0),
         "pause": str(data.get("pause") or ""),
         "pause_at": float(data.get("pause_at") or 0),
         "pause_code": str(data.get("pause_code") or ""),
@@ -264,7 +267,7 @@ def resolve_room(text: str) -> str:
 
 
 def _names() -> list:
-    raw = os.environ.get("RP_BILI_NAMES") or "jinyu"
+    raw = os.environ.get("RP_BILI_NAMES") or "瑾瑜,jinyu"
     return [x.strip() for x in raw.split(",") if x.strip()]
 
 
@@ -663,6 +666,23 @@ def comment_allowed() -> tuple[bool, str]:
     return True, ""
 
 
+def _clip_text(t: str, limit: int) -> str:
+    """按字数上限截断：尽量在句读处收口，不要把话切在半个词上。"""
+    limit = max(20, int(limit))
+    if len(t) <= limit:
+        return t
+    head = t[:limit]
+    for mark in ("。", "！", "？", "；", "…"):
+        i = head.rfind(mark)
+        if i >= limit // 2:
+            return head[:i + 1]
+    for mark in ("，", "、", ",", " "):
+        i = head.rfind(mark)
+        if i >= limit // 2:
+            return head[:i].rstrip("，、, ") + "…"
+    return head[: max(1, limit - 1)].rstrip() + "…"
+
+
 def clean_comment(text: str, limit: int = 0) -> str:
     """评论正文：去标记/换行，按字数上限截断。
 
@@ -686,7 +706,7 @@ def clean_comment(text: str, limit: int = 0) -> str:
         t = re.sub(r"\x00OWNER\x00\s*", f"@{name} ", t).strip()
         if t.endswith("@" + name):
             t = t + " "
-    return t[:max(20, limit)]
+    return _clip_text(t, limit)
 
 
 def _drop_owner(text: str) -> str:
@@ -786,6 +806,175 @@ def post_comment(aid: int, text: str, bvid: str = "") -> tuple[bool, str]:
     if not ok:
         return False, why
     return _comment_result(_post_comment_net(aid, msg, bvid), aid, msg, bvid)
+
+
+# ---------- @我的 ----------
+def at_quota() -> int:
+    return max(0, int(float(os.environ.get("RP_BILI_AT_DAILY") or 8)))
+
+
+def _at_today() -> int:
+    today = time.strftime("%Y-%m-%d")
+    if _state.get("at_day") != today:
+        _state["at_day"], _state["at_sent"] = today, 0
+    return int(_state.get("at_sent") or 0)
+
+
+def at_allowed() -> tuple[bool, str]:
+    """自动回复 @ 前的闸门：登录、暂停、每日额度、间隔，和评论额度分开算。"""
+    if not can_send():
+        return False, "未登录，先 /bili login 扫码"
+    blocked, why = paused()
+    if blocked:
+        return False, why
+    quota = at_quota()
+    if quota <= 0:
+        return False, "@回复已关闭（RP_BILI_AT_DAILY=0）"
+    if _at_today() >= quota:
+        return False, f"今日@回复额度已用完（{quota} 条）"
+    gap = max(0.0, float(os.environ.get("RP_BILI_AT_GAP") or 180))
+    if gap and time.time() - float(_state.get("_last_at") or 0) < gap:
+        return False, "@回复太快，先缓一缓"
+    return True, ""
+
+
+def fetch_at_me() -> list:
+    """拉「@我的」通知，只返回游标之后的新条目（按时间旧到新）。
+
+    第一次运行（游标=0）只把游标记到最新一条，不回复历史 @，
+    否则刚开功能就会把很久以前的 @ 全部回一遍。
+    """
+    if not can_send():
+        return []
+    import httpx
+    try:
+        with httpx.Client(timeout=12, headers=_headers()) as c:
+            d = c.get(API + "/x/msgfeed/at", params={"platform": "web"}).json()
+    except (httpx.HTTPError, ValueError) as e:
+        logger.info("B站@通知读取失败：%s", type(e).__name__)
+        return []
+    if d.get("code") != 0:
+        logger.info("B站@通知读取失败 code=%s msg=%s", d.get("code"), d.get("message"))
+        return []
+    items = ((d.get("data") or {}).get("items") or [])
+    try:
+        seen = int(_state.get("at_seen") or 0)
+    except (TypeError, ValueError):
+        seen = 0
+    out = []
+    for it in items:
+        item = it.get("item") or it
+        try:
+            rid = int(it.get("id") or item.get("id") or 0)
+        except (TypeError, ValueError):
+            continue
+        if not rid:
+            continue
+        user = item.get("user") or it.get("user") or {}
+        if seen <= 0:
+            continue                      # 首次运行：下面统一把游标推到最新
+        if rid <= seen:
+            continue
+        out.append({
+            "id": rid,
+            "oid": str(item.get("subject_id") or ""),
+            "type": _at_type(item),
+            "root": str(item.get("root_id") or 0),
+            "parent": str(item.get("source_id") or 0),
+            "mid": str(user.get("mid") or ""),
+            "uname": str(user.get("nickname") or ""),
+            "text": str(item.get("source_content")
+                        or item.get("target_reply_content") or "").strip(),
+        })
+    out.sort(key=lambda x: x["id"])
+    if seen <= 0:
+        mark_at(max([int(it.get("id") or 0) for it in items] or [0]))
+        logger.info("B站@首次运行：游标直接推到最新，不回复历史@")
+        return []
+    return out
+
+
+def _at_type(item: dict) -> int:
+    """通知里的来源类型 → reply/add 的 type：视频=1，专栏=12，动态=17。
+
+    实测 msgfeed/at 的 type 是字符串（'reply'），真正可用的分类在 business：
+    1=视频、11=动态、12=专栏。认不出来就按视频处理（评论区接口最通用）。
+    """
+    try:
+        return int(item.get("type") or 0) or 17
+    except (TypeError, ValueError):
+        pass
+    try:
+        biz = int(item.get("business") or item.get("business_id") or 0)
+    except (TypeError, ValueError):
+        biz = 0
+    if biz == 11:
+        return 17
+    if biz in (1, 12, 13, 14, 17):
+        return biz
+    raw = str(item.get("type") or "").lower()
+    if "dynamic" in raw or "opus" in raw:
+        return 17
+    if "article" in raw:
+        return 12
+    return 1
+
+
+def mark_at(reply_id) -> None:
+    """游标只进不退：处理过（回复或主动跳过）就记账，重启不重复回。"""
+    try:
+        rid = int(reply_id or 0)
+    except (TypeError, ValueError):
+        return
+    if rid > int(_state.get("at_seen") or 0):
+        _state["at_seen"] = rid
+        _save()
+
+
+def reply_at(oid: str, type_: int, root: str, parent: str,
+             text: str) -> tuple[bool, str]:
+    """回复一条 @我的：动态/视频共用 reply/add，type 按通知里的来源透传。"""
+    ok, why = at_allowed()
+    if not ok:
+        return False, why
+    if not oid:
+        return False, "找不到这条@的评论区"
+    try:
+        limit = int(float(os.environ.get("RP_BILI_AT_CHARS") or 300))
+    except (TypeError, ValueError):
+        limit = 300
+    msg = clean_comment(text, limit=limit)
+    if not msg:
+        return False, "回复内容为空"
+    ok, why = check_account()
+    if not ok:
+        return False, why
+    _warmup()
+    import httpx
+    try:
+        with httpx.Client(timeout=12, headers=_headers()) as c:
+            r = c.post(API + "/x/v2/reply/add", data={
+                "oid": oid, "type": str(type_ or 17), "message": msg,
+                "root": str(root or 0), "parent": str(parent or 0),
+                "plat": "1", "csrf": _state.get("bili_jct", ""),
+                "csrf_token": _state.get("bili_jct", "")})
+            d = r.json() or {}
+    except (httpx.HTTPError, ValueError) as e:
+        return False, f"回复失败：{type(e).__name__}"
+    if d.get("code") != 0:
+        logger.warning("B站@回复失败 oid=%s type=%s code=%s msg=%s",
+                       oid, type_, d.get("code"), d.get("message"))
+        reason = _risk_reason(d)
+        if reason:
+            pause(f"@回复{reason}", d.get("code"))
+            return False, f"回复被拦下：{reason}。写操作已暂停，发 /bili unlock 解除。"
+        return False, f"回复失败：{d.get('message') or d.get('code')}"
+    _state["_last_at"] = time.time()
+    _state["at_sent"] = _at_today() + 1
+    _save()
+    logger.info("B站@回复已发送 id=%s oid=%s type=%s chars=%d",
+                (d.get("data") or {}).get("rpid"), oid, type_, len(msg))
+    return True, msg
 
 
 # ---------- 带图评论：视频笔记（普通评论接口不支持图片） ----------

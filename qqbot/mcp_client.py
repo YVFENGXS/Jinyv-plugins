@@ -33,11 +33,11 @@ import os
 import re
 import threading
 
-logger = logging.getLogger("jinyu_memory.mcp")
+logger = logging.getLogger("jinyv_memory.mcp")
 
 DEFAULT_TIMEOUT = 6.0
 MAX_TOOLS = 8                 # 工具总数上限，防止一次塞爆 prompt
-MAX_DESC = 300                # 工具描述截断，控制 token
+MAX_DESC = 500                # 工具描述截断，控制 token
 _START_TIMEOUT = 12.0
 
 # 只把必要变量传给 MCP 子进程，避免把密钥透给第三方工具

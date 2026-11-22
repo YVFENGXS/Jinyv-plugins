@@ -1,23 +1,29 @@
-# Jinyv Host API 插件
+# Host HTTP API
 
-零依赖宿主 HTTP API，供桌宠、视频通话、DSH 等外部进程读写共享记忆。
+给桌宠、通话、DSH 等外部进程一个统一的记忆写入 / 召回通道。
 
-## 配置（主仓库 `config/plugins/host-api.toml`）
+服务实现不在这里复制，唯一真源是
+**[Jinyv-memory/tools/serve.py](https://github.com/YVFENGXS/Jinyv-memory)**。
+本目录只是启动器，负责定位记忆仓库并透传参数。
 
-```toml
-enabled = true
-host = "127.0.0.1"
-port = 8710
-account = "owner_qq"
-token = ""   # 或用环境变量 JINYV_HOST_API_TOKEN
+## 启动
+
+```bash
+export RP_HOST_TOKEN=<随机串>
+export RP_FRONT_KEY=sk-... RP_BACK_KEY=sk-...
+python host-api/__init__.py --host 127.0.0.1 --port 8710 --db data/rp_memory.db
 ```
 
-## 端点
+## 接口
 
-- `GET /health`
-- `POST /chat` `{"text","session","account","speaker","source","store_reply"}` → `{"reply","session"}`
-  - `store_reply`：用给定原文覆盖生成的回复落库（通话场景）
-- `POST /remember` `{"text","speaker","importance","account","session"}` → `{"ok","id"}`
-- `GET /recall?q=&limit=&account=&session=&speaker=` → 召回结果
+| 方法 | 路径 | 作用 |
+|---|---|---|
+| GET | `/health` | 存活检查（不校验令牌） |
+| POST | `/chat` | `{"text","session"}` → `{"reply","session"}` |
+| POST | `/remember` | `{"text","speaker","importance","session"}` → `{"ok","id"}` |
+| GET | `/recall?q=&session=&limit=` | 只读召回 |
 
-除 `/health` 外都需要 `Authorization: Bearer <token>`。
+除 `/health` 外都要 `Authorization: Bearer <RP_HOST_TOKEN>`。
+
+**同一个 `RP_DB` 只能有一个写入进程**：QQ 插件、宿主 API、桌宠服务不要同时
+开写库模式。桌宠 / 通话请把 `core_url` 指到本服务。

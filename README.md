@@ -1,48 +1,59 @@
 # Jinyv Plugins
 
-Jinyv 外围插件单一仓库。每个插件是仓库内的一个子目录，主仓库通过
-`config/core.toml` 的 `[plugins].search_paths` 发现并加载。
+瑾瑜的外围能力仓库。**记忆中间层在独立仓库
+[Jinyv-memory](https://github.com/YVFENGXS/Jinyv-memory)**，这里只放平台接入。
 
 ```
 Jinyv-plugins/
-├── qqbot/          # QQ 适配层 + features 能力入口
-├── desktop-pet/    # 桌宠 desktop-v1 服务端适配层
-├── video-call/     # 视频通话适配层 + HTTP 桥
-├── jinyu-memory-dsh/  # DSH JS/cordis 特殊插件源码 + dsh-wins 安装补丁
-└── host-api/       # 宿主 HTTP API（/chat /remember /recall）
+├── qqbot/             # 完整 QQ 接入（NoneBot2 插件）
+├── kook/              # KOOK 接入（Koishi + Satori sidecar）
+├── host-api/          # 宿主 HTTP API 启动器（/chat /remember /recall）
+├── desktop-pet/       # 桌宠服务端适配层（客户端在 Jinyu-pet 仓库）
+├── video-call/        # 通话记忆适配层（服务在 jinyu-video-call 仓库）
+└── jinyu-memory-dsh/  # DSH JS/cordis 插件源码 + 安装补丁
 ```
 
-## 上游引用
+## 上游
 
-| 插件 | 上游原仓库 | 说明 |
+| 目录 | 上游 | 说明 |
 |---|---|---|
-| desktop-pet | https://github.com/YVFENGXS/Jinyu-pet | 客户端独立仓库；本目录只放服务端适配层，不复制客户端源码 |
-| video-call | https://github.com/YVFENGXS/jinyu-video-call | 服务独立仓库；本目录只放适配层，不复制服务源码 |
-| qqbot | 主仓库旧实现已迁入 `features/` | 8 个能力模块已复制并改写导入；旧目录仅作 `legacy_entry` 回退 |
-| dsh | 用户 zip（源码已纳入本仓库） | 特殊接入；源码与 dsh-wins 安装补丁在 `jinyu-memory-dsh/` |
-| host-api | 无上游 | 主仓库与外部进程共用的 HTTP 写入通道 |
+| qqbot | 无（本仓维护） | 依赖 Jinyv-memory core |
+| kook | Koishi / Satori | 侧车只做协议转换 |
+| host-api | Jinyv-memory/tools/serve.py | 只做启动器，不复制 HTTP 实现 |
+| desktop-pet | [Jinyu-pet](https://github.com/YVFENGXS/Jinyu-pet) | 只放服务端适配层 |
+| video-call | [jinyu-video-call](https://github.com/YVFENGXS/jinyu-video-call) | 只放记忆桥接 |
+| jinyu-memory-dsh | 用户 zip | JS/cordis 特殊插件 |
 
-## 记忆核心接入
+房间 / 舞台渲染在 [Jinyv-room](https://github.com/YVFENGXS/Jinyv-room)，
+`qqbot/jinyv_stage/` 只是可选的工具桥。
 
-`desktop-pet` 与 `video-call` 都支持 `core_mode`：
+## 运行拓扑
 
-| 模式 | 说明 |
-|---|---|
-| `embedded` | 与核心同进程，直接使用 `MemoryAPI`（默认） |
-| `local` | 连本机宿主 API `http://127.0.0.1:8710` |
-| `server` | 连配置的远程 `core_url` |
-
-桌宠还可独立运行 `python desktop-pet/standalone.py --core-url ...`，
-不要求核心进程加载本插件。
-
-## 远程
-
-远程已创建并推送 `main`：`https://github.com/YVFENGXS/jinyv-plugins`
-
-```powershell
-git -C E:\Jinyv-plugins push origin main
 ```
+QQ ───> qqbot (NoneBot2，/jinyu/chat) ────> Jinyv-memory core ──> RP_DB
+KOOK ─> kook sidecar ──> /jinyu/chat ─────┘
+桌宠 / 通话 ─> host-api (/chat) ──> Jinyv-memory core ────────────┘
+```
+
+**同一个 `RP_DB` 只能有一个写入进程**。当前生产由 qqbot 独占写库，
+所以 KOOK sidecar 指向 qqbot 的 `/jinyu/chat`；`host-api` 是给「不由 QQ
+独占」的场景准备的（`/chat` 只有 text/session，历史契约不同，暂不合并）。
+
+## 快速开始
+
+```bash
+# 1. 记忆层
+pip install -e ../Jinyv-memory        # 或 export JINYV_MEMORY_HOME=../Jinyv-memory
+
+# 2. QQ
+pip install -r qqbot/requirements.txt
+cp qqbot/env.example .env             # 填 ONEBOT_ACCESS_TOKEN / RP_FRONT_KEY / RP_BACK_KEY
+```
+
+`qqbot/` 放进 NoneBot 的 `plugin_dirs` 即会自动注册消息入口。
 
 ## 历史
 
-原先三个子仓库的 git 历史保存在 `.repo-history/*.git`（已 gitignore，不进入本仓库提交）。
+第一版契约式插件（`jinyv_memory.contract` + `features/` 只读桥）已废弃：
+它依赖一个从未实现的宿主运行时，且 features 副本落后于线上。现在
+`qqbot/` 直接使用 Jinyv-memory core，能力模块与线上逐文件同步。

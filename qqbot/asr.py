@@ -18,9 +18,9 @@ from pathlib import Path
 
 import httpx
 
-from .richmsg import url_is_public
+from richmsg import url_is_public
 
-logger = logging.getLogger("jinyu_memory")
+logger = logging.getLogger("jinyv_memory")
 
 MAX_AUDIO = 20 * 1024 * 1024
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "

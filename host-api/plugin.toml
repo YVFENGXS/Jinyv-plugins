@@ -1,9 +1,10 @@
 [plugin]
 id = "host-api"
 name = "Host HTTP API"
-version = "0.1.0"
-kind = "adapter"
+version = "0.2.0"
+kind = "service"
 entry = "__init__.py"
-description = "零依赖宿主 HTTP API：/chat /remember /recall，给桌宠、通话与 DSH 写入。"
+description = "独立进程运行 Jinyv-memory/tools/serve.py，给桌宠、通话、DSH 一个 HTTP 写入通道。"
+requires = ["jinyv_memory"]
 optional_modules = []
 provides = ["api.host"]
