@@ -8,9 +8,7 @@
 """
 from __future__ import annotations
 
-import json
-import urllib.error
-import urllib.request
+from transport import request_json
 
 
 class CallBridge:
@@ -21,31 +19,11 @@ class CallBridge:
 
     def _request(self, method: str, path: str, payload: dict | None = None,
                  auth: bool = True) -> dict:
-        if not self.base_url:
-            return {"ok": False, "error": "service_url 未配置"}
-        data = None if payload is None else json.dumps(
-            payload, ensure_ascii=False
-        ).encode("utf-8")
-        request = urllib.request.Request(
-            f"{self.base_url}{path}", data=data, method=method,
-            headers={"Content-Type": "application/json"},
+        return request_json(
+            self.base_url, self.token, method, path,
+            payload=payload, timeout=self.timeout, auth=auth,
+            missing="service_url 未配置",
         )
-        if auth and self.token:
-            request.add_header("Authorization", f"Bearer {self.token}")
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                return json.loads(response.read().decode("utf-8") or "{}")
-        except urllib.error.HTTPError as exc:
-            body = exc.read().decode("utf-8", "ignore") or "{}"
-            try:
-                data = json.loads(body)
-            except ValueError:
-                data = {"error": body}
-            data.setdefault("ok", False)
-            data.setdefault("status", exc.code)
-            return data
-        except (urllib.error.URLError, TimeoutError, ValueError) as exc:
-            return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
     def health(self) -> dict:
         return self._request("GET", "/health", auth=False)

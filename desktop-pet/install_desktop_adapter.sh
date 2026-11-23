@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # 在 QQ 机器人服务器上安装 desktop-v1 适配器（rp-desktop.service）。
 #
-# 用法（把 desktop_server.py 一起 scp 到 /tmp 后执行；必须指定要共用的会话）：
-#   scp -i .deploy_key desktop_server.py ubuntu@HOST:/tmp/desktop_server.py
+# 用法（把整个 desktop-pet 目录一起 scp 到 /tmp 后执行；必须指定要共用的会话）：
+#   scp -r desktop-pet ubuntu@HOST:/tmp/desktop-pet
 #   scp -i .deploy_key deploy/install_desktop_adapter.sh ubuntu@HOST:/tmp/
 #   ssh ... "sed -i 's/\r$//' /tmp/install_desktop_adapter.sh && \
-#            sudo RP_SESSION=qq-u你的QQ号 bash /tmp/install_desktop_adapter.sh"
+#            sudo RP_SESSION=qq-u你的QQ号 bash /tmp/install_desktop_adapter.sh /tmp/desktop-pet"
 #
 # 密钥不在脚本里复制：服务通过 EnvironmentFile 读取现有的 /opt/qqbot/bot/.env。
 # 桌宠不直接读写 QQ 主库（同一个 RP_DB 只能有一个归档进程，否则游标互抢），
@@ -15,24 +15,28 @@
 set -euo pipefail
 
 BOT_DIR=/opt/qqbot/bot
-SRC=${1:-/tmp/desktop_server.py}
+SRC=${1:-/tmp/desktop-pet}
 DST_DIR=/opt/qqbot/desktop
 UNIT=/etc/systemd/system/rp-desktop.service
 ENVFILE=/etc/rp-desktop.env
 BOT_ENV=$BOT_DIR/.env
 HOST_PORT=${RP_HOST_PORT:-8080}
 
-test -f "$SRC" || { echo "missing $SRC"; exit 1; }
+test -d "$SRC" || { echo "missing desktop-pet dir: $SRC"; exit 1; }
+test -f "$SRC/standalone.py" || { echo "missing $SRC/standalone.py"; exit 1; }
 test -x "$BOT_DIR/.venv/bin/python" || { echo "missing bot venv"; exit 1; }
 test -f "$BOT_ENV" || { echo "missing $BOT_ENV"; exit 1; }
 if [ -z "${RP_SESSION:-}" ]; then
-  echo "用法: sudo RP_SESSION=qq-u你的QQ号 bash $0 [desktop_server.py]"
+  echo "用法: sudo RP_SESSION=qq-u你的QQ号 bash $0 [desktop-pet 目录]"
   echo "（会话号不再内置，必须显式指定；它必须和 QQ 私聊使用的会话一致）"
   exit 1
 fi
 
 install -d -o qqbot -g qqbot -m 755 "$DST_DIR"
-install -o qqbot -g qqbot -m 644 "$SRC" "$DST_DIR/desktop_server.py"
+for f in standalone.py bootstrap.py config.py adapter.py server.py protocol.py core_client.py; do
+  test -f "$SRC/$f" || { echo "missing $SRC/$f"; exit 1; }
+  install -o qqbot -g qqbot -m 644 "$SRC/$f" "$DST_DIR/$f"
+done
 
 # 宿主接口令牌：优先复用 bot .env 里已有的；没有就生成并追加（需重启 QQ 才生效）
 read_env() {
@@ -94,7 +98,7 @@ Group=qqbot
 WorkingDirectory=$DST_DIR
 EnvironmentFile=$BOT_ENV
 EnvironmentFile=$ENVFILE
-ExecStart=$BOT_DIR/.venv/bin/python $DST_DIR/desktop_server.py
+ExecStart=$BOT_DIR/.venv/bin/python $DST_DIR/standalone.py
 Restart=always
 RestartSec=5
 TimeoutStopSec=30

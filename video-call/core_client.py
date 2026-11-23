@@ -6,10 +6,7 @@
 """
 from __future__ import annotations
 
-import json
-import urllib.error
-import urllib.parse
-import urllib.request
+from transport import request_json
 
 
 class CoreClient:
@@ -23,36 +20,11 @@ class CoreClient:
 
     def _request(self, method: str, path: str, payload: dict | None = None,
                  query: dict | None = None, auth: bool = True) -> dict:
-        if not self.base_url:
-            return {"ok": False, "error": "core_url 未配置"}
-        url = f"{self.base_url}{path}"
-        if query:
-            url += "?" + urllib.parse.urlencode(query)
-        data = None if payload is None else json.dumps(
-            payload, ensure_ascii=False
-        ).encode("utf-8")
-        request = urllib.request.Request(
-            url, data=data, method=method,
-            headers={"Content-Type": "application/json"},
+        return request_json(
+            self.base_url, self.token, method, path,
+            payload=payload, query=query, timeout=self.timeout, auth=auth,
+            missing="core_url 未配置",
         )
-        if auth and self.token:
-            request.add_header("Authorization", f"Bearer {self.token}")
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                body = json.loads(response.read().decode("utf-8") or "{}")
-                body.setdefault("ok", True)
-                return body
-        except urllib.error.HTTPError as exc:
-            raw = exc.read().decode("utf-8", "ignore") or "{}"
-            try:
-                body = json.loads(raw)
-            except ValueError:
-                body = {"error": raw}
-            body.setdefault("ok", False)
-            body.setdefault("status", exc.code)
-            return body
-        except (urllib.error.URLError, TimeoutError, ValueError) as exc:
-            return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
     def health(self) -> dict:
         return self._request("GET", "/health", auth=False)

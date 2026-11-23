@@ -13,8 +13,13 @@ KOOK ──> Koishi（adapter-kook + plugin-server/Satori）
 
 | 文件 | 作用 |
 |---|---|
-| `satori_sidecar.py` | Satori WebSocket 客户端 + 宿主 HTTP 转发 |
-| `capabilities.py` | 能力开关与降级判断 |
+| `satori_sidecar.py` | 组合根：Satori 事件循环 + 收发消息 |
+| `bootstrap.py` | 启动层：日志、watchdog 事件戳、挂 sys.path |
+| `config.py` | 配置层：环境变量解析与校验 |
+| `host_client.py` | 宿主 HTTP：`/jinyu/chat`、`/jinyu/health` |
+| `fallback.py` | 兜底发送口 `/send` 与 KOOK 图床上传 |
+| `media.py` | 从 Satori 消息提取图片、剥图片标记 |
+| `capabilities.py` | 能力开关与元素降级 |
 | `config.example.env` | 环境变量模板 |
 | `deploy/koishi/` | Koishi 启动入口、`koishi.yml`、`package.json` |
 

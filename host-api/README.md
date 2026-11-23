@@ -6,6 +6,14 @@
 **[Jinyv-memory/tools/serve.py](https://github.com/YVFENGXS/Jinyv-memory)**。
 本目录只是启动器，负责定位记忆仓库并透传参数。
 
+## 文件
+
+| 文件 | 作用 |
+|---|---|
+| `__init__.py` | 组合根：只调用 bootstrap |
+| `config.py` | 命令行参数与环境变量 |
+| `bootstrap.py` | 定位 `Jinyv-memory/tools/serve.py` 并透传 |
+
 ## 启动
 
 ```bash

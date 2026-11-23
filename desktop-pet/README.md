@@ -36,7 +36,10 @@ python standalone.py --core-url http://127.0.0.1:8710 --port 8787
 
 | 文件 | 作用 |
 |---|---|
-| `standalone.py` | 独立启动入口（uvicorn） |
+| `standalone.py` | 组合根 / 独立启动入口 |
+| `bootstrap.py` | 启动层：健康检查 + uvicorn |
+| `config.py` | 命令行参数与环境变量 |
+| `adapter.py` | desktop-v1 适配对象（上行文字 → 宿主 `/chat`） |
 | `server.py` | FastAPI 路由与 WebSocket |
 | `protocol.py` | desktop-v1 信封 / 气泡拆分 / 动作提取 |
 | `core_client.py` | 宿主 HTTP 客户端（stdlib urllib） |
