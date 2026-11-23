@@ -1,10 +1,10 @@
 [plugin]
 id = "qqbot"
 name = "QQ Bot (OneBot v11)"
-version = "0.2.0"
+version = "0.2.1"
 kind = "platform-adapter"
 entry = "__init__.py"
-description = "完整 QQ 接入：消息 / 富消息 / 语音 / 提醒 / B站 / 音乐 / 天气 / MCP / 自主作息。依赖 Jinyv-memory core。"
+description = "完整 QQ 接入：消息 / 富消息 / 语音 / 提醒 / B站 / 音乐 / 天气 / MCP / 自主作息。依赖 Jinyv-memory core；bootstrap/config/features 分层。"
 requires = ["jinyv_memory"]
 optional_modules = ["nonebot", "nonebot.adapters.onebot.v11", "httpx", "numpy", "mcp"]
 provides = ["platform.qq"]

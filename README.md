@@ -5,7 +5,7 @@
 
 ```
 Jinyv-plugins/
-├── qqbot/             # 完整 QQ 接入（NoneBot2 插件）
+├── qqbot/             # 完整 QQ 接入（NoneBot2 插件；bootstrap/config/features 分层）
 ├── kook/              # KOOK 接入（Koishi + Satori sidecar）
 ├── host-api/          # 宿主 HTTP API 启动器（/chat /remember /recall）
 ├── desktop-pet/       # 桌宠服务端适配层（客户端在 Jinyu-pet 仓库）

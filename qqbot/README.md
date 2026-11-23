@@ -4,11 +4,27 @@
 记忆逻辑全部在独立仓库 **[Jinyv-memory](https://github.com/YVFENGXS/Jinyv-memory)** 的
 `jinyv_memory/core/`，本目录只放平台能力。
 
+结构分四层：`bootstrap.py`（启动）→ `config.py`（配置）→ `features/`（可插拔功能）→
+`__init__.py`（组合根：matcher、运行期状态、消息入口）。新功能加在 `features/` 或独立模块，
+不再往入口堆。
+
 ## 能力
 
 | 模块 | 说明 |
 |---|---|
-| `__init__.py` | 消息入口：私聊全收、群聊 @ 才回；富消息 / 主动话题 / 命令 / 轮换 |
+| `__init__.py` | 组合根：消息入口、运行期状态、matcher 注册；功能实现逐步下沉到子模块 |
+| `bootstrap.py` | 启动层：定位 Jinyv-memory core、挂 sys.path、桥接标准日志 |
+| `config.py` | 配置层：只解析环境变量为常量，不持有可变状态 |
+| `social_state.py` | 签名 / 说说 / 社交圈共用的轻量状态文件 |
+| `features/social_post.py` | 低频社交动作：个性签名、QQ 空间说说 |
+| `tools_reminder.py` | 提醒类工具：登记 / 查询 / 修改 / 取消（调度仍在 `reminder.py`） |
+| `stage.py` | 舞台 / 身体桥：身体工具挂表、`body_intent` 后台解码、房间括号动作 |
+| `host_api.py` | 宿主 HTTP 接口：`/jinyu/chat`、`/jinyu/health`，复用本进程中间件与会话锁 |
+| `outbound.py` | 出站层：气泡拆分、富消息渲染、主动发送、已发消息编号与撤回 |
+| `media.py` | 媒体层：图片判读、语音/音频/链接注记、贴纸自学习采集 |
+| `bili.py` | B 站层：弹幕监听、@ 我的自动回复、账号工具与 `/bili` 指令 |
+| `loops.py` | 后台循环：闲置主动、词条/事件卡合并、Dream、余额、向量回填、提醒投递 |
+| `admin.py` | 管理指令层：`/memory`、`/merge`、`/social`、贴纸与语音管理等运维入口 |
 | `richmsg.py` | `[[face]]` / `[[img]]` / `[[search]]` / `[[sticker]]` / `[[voice]]` 渲染与贴纸库 |
 | `asr.py` | QQ 语音转文字 |
 | `linkmeta.py` | 链接抓取、视频抽帧、B 站元数据、联网搜索 |
@@ -66,7 +82,7 @@
 
 ## 定位 core
 
-`__init__.py` 按以下顺序查找 `jinyv_memory/core`：
+`bootstrap.py` 按以下顺序查找 `jinyv_memory/core`：
 
 1. `$JINYV_MEMORY_HOME/jinyv_memory/core`
 2. 已安装的 `jinyv_memory` 包

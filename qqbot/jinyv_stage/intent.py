@@ -186,7 +186,7 @@ def success(intent: str, did: list, origin: str = "user") -> dict[str, Any]:
         "did": did,
         "origin": origin,
         "message": f"已完成：{names}",
-        "hint": ("动作已完成。用一两句话回应主人，不要只描述动作，"
+        "hint": ("动作已完成。回应主人，不要只描述动作，"
                  "也不要把已经做完的说成还没做。"),
     }
 
