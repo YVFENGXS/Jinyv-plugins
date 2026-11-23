@@ -259,6 +259,47 @@ async def health():
     })
 
 
+async def event(request):
+    """环境事件入口：房间/桌宠的低频状态变化，直接补一条长期词条。
+
+    与 /jinyu/chat 分开：这里没有对话、不调模型、不写 turns，只把
+    「在房间里坐下」「喂了鱼」这类事实记下来，成本接近零。
+    """
+    from fastapi.responses import JSONResponse
+    if not _host_authed(request):
+        return JSONResponse({"ok": False, "error": "unauthorized"}, status_code=401)
+    mw_plain = _get_mw_plain()
+    if mw_plain is None:
+        return JSONResponse({"ok": False, "error": "memory not ready"}, status_code=503)
+    try:
+        body = await request.json()
+    except Exception:                             # noqa: BLE001
+        return JSONResponse({"ok": False, "error": "请求不是 JSON"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"ok": False, "error": "请求体必须是对象"}, status_code=400)
+    text = str(body.get("text") or "").strip()[:300]
+    if not text:
+        return JSONResponse({"ok": False, "error": "缺少 text"}, status_code=400)
+    source = str(body.get("source") or "room").strip().lower()[:20]
+    try:
+        importance = float(body.get("importance") or 0.45)
+    except (TypeError, ValueError):
+        importance = 0.45
+    sid = (HOST_SESSION_ROOM or HOST_SESSION) if source == "room" else HOST_SESSION
+    lock = _get_locks().setdefault(sid, asyncio.Lock())
+    try:
+        async with lock:
+            fact_id = await asyncio.to_thread(
+                mw_plain.db.add_fact, sid, CID, text, 0, "主人",
+                max(0.2, min(0.9, importance)))
+    except Exception as exc:                      # noqa: BLE001
+        logger.warning(f"[jinyu] 环境事件写入失败 source={source}: {type(exc).__name__}")
+        return JSONResponse({"ok": False, "error": "internal"}, status_code=500)
+    logger.info(f"[jinyu] 环境事件 source={source} kind={str(body.get('kind') or '-')[:20]} "
+                f"id={fact_id} text={text[:40]!r}")
+    return JSONResponse({"ok": True, "id": fact_id, "session": sid, "source": source})
+
+
 def install_host_routes() -> None:
     global _HOST_ROUTES_READY
     if _HOST_ROUTES_READY:
@@ -275,8 +316,10 @@ def install_host_routes() -> None:
     # 只在确认是 FastAPI 时导入并补注解，aiohttp 部署不会因缺依赖而加载失败。
     from fastapi import Request
     chat.__annotations__["request"] = Request
+    event.__annotations__["request"] = Request
     # legacy 契约，勿改：桌宠 / 通话 / room / satori 侧车都硬编码了这个路径
     app.add_api_route("/jinyu/chat", chat, methods=["POST"])
+    app.add_api_route("/jinyu/event", event, methods=["POST"])
     app.add_api_route("/jinyu/health", health, methods=["GET"])
     _HOST_ROUTES_READY = True
-    logger.info("[jinyu] 宿主接口就绪 /jinyu/chat（Bearer 校验，source=qq/desk/video/room）")
+    logger.info("[jinyu] 宿主接口就绪 /jinyu/chat + /jinyu/event（Bearer 校验，source=qq/desk/video/room）")

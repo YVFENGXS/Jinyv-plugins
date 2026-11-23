@@ -7,7 +7,7 @@ WebGL / Live2D 资产。
 ## 边界
 
 - 不直连 SQLite：一律通过宿主 HTTP API（[host-api](../host-api)）读写记忆。
-- 提供 `/desktop/v1/health`、`/desktop/v1/say`、`/desktop/v1/ws`。
+- 提供 `/desktop/v1/health`、`/desktop/v1/presence`、`/desktop/v1/say`、`/desktop/v1/ws`。
 - 上行文字 → 宿主 `/chat`；下行气泡 / 动作标记走 desktop-v1 协议。
 - 可独立进程运行，不要求与 QQ 插件同进程。
 
@@ -35,6 +35,9 @@ python standalone.py --core-url http://127.0.0.1:8710 --port 8787
 `/jinyu` 前缀（对应 `/jinyu/chat`、`/jinyu/health`）；指向独立 host-api 时保持 `/chat`。
 
 协议文档：[docs/desktop-v1.md](docs/desktop-v1.md)。
+
+`/desktop/v1/health` 与 `/desktop/v1/presence` 都会返回当前 WS 连接数；客户端
+重连后以最新 `hello.ack` 的 `server_time` 为准，不依赖本地时钟。
 
 ## 文件
 

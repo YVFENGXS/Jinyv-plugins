@@ -22,6 +22,7 @@ def create_app(plugin: Any, ctx: Any):
 
     app = FastAPI(title="jinyv-desktop-v1")
     token = plugin.token
+    clients: set = set()
 
     def authed(supplied: str) -> bool:
         import hmac
@@ -32,10 +33,20 @@ def create_app(plugin: Any, ctx: Any):
         return JSONResponse({
             "ok": True, "protocol": "desktop-v1", "mode": "adapter",
             "connected": plugin.connected,
+            "ws_clients": len(clients),
             "core_mode": getattr(plugin, "core_mode", "embedded"),
             "core_url": getattr(plugin, "core_url", ""),
             "core_ok": bool(getattr(plugin, "core_ok", True)),
         })
+
+    @app.get("/desktop/v1/presence")
+    async def presence(request: Request):
+        supplied = request.headers.get("authorization", "").replace("Bearer ", "").strip()
+        if not authed(supplied):
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        return JSONResponse({"ok": True, "ws_clients": len(clients),
+                             "connected": plugin.connected,
+                             "session": plugin.session_id})
 
     @app.post("/desktop/v1/say")
     async def say(request: Request):
@@ -56,6 +67,7 @@ def create_app(plugin: Any, ctx: Any):
             await ws.close(code=4001)
             return
         await ws.accept()
+        clients.add(ws)
         plugin.connected = True
         device_id = "dev_" + plugin.new_device_id()
         seq = 0
@@ -105,6 +117,7 @@ def create_app(plugin: Any, ctx: Any):
         except (WebSocketDisconnect, asyncio.TimeoutError):
             pass
         finally:
-            plugin.connected = False
+            clients.discard(ws)
+            plugin.connected = bool(clients)
 
     return app

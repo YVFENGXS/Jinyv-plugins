@@ -5,6 +5,7 @@
 
 ```
 Jinyv-plugins/
+├── common/            # 跨端共享层：通道口径 / 生理状态 / 待总结队列
 ├── qqbot/             # 完整 QQ 接入（NoneBot2 插件；bootstrap/config/features 分层）
 ├── kook/              # KOOK 接入（Koishi + Satori sidecar）
 ├── host-api/          # 宿主 HTTP API 启动器（/chat /remember /recall）
@@ -12,6 +13,18 @@ Jinyv-plugins/
 ├── video-call/        # 通话记忆适配层（服务在 jinyu-video-call 仓库）
 └── jinyu-memory-dsh/  # DSH JS/cordis 插件源码 + 安装补丁
 ```
+
+## 共享层
+
+`common/` 只放跨端复用的纯逻辑，不绑定 NoneBot / FastAPI：
+
+| 模块 | 作用 |
+|---|---|
+| `channel.py` | 通道口径：同一套人设，按 QQ / KOOK / 桌宠 / 视频 / 房间追加媒介约束。打字通道不限制字数。 |
+| `vitals.py` | 最小生理状态（精力/饿/渴/困/迷糊），按小时回稳；`brief()` 给 prompt 一句话，`decide()` 给主动行为当闸门。 |
+| `pending.py` | 跨端待总结队列：只读端投递，主写进程 `claim` → 写记忆 → `ack`。SQLite WAL，支持多进程。 |
+
+状态库路径默认 `data/vitals.db`、`data/pending.db`，可用 `RP_VITALS_DB` / `RP_PENDING_DB` 覆盖。
 
 ## 上游
 

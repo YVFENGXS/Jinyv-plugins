@@ -133,7 +133,7 @@ from typing import Optional
 # 插件可能以包的形式被 NoneBot 加载，自身目录不会自动进 sys.path；
 # 先挂上插件目录和 core，后面 bootstrap / 同级模块才能按绝对名导入。
 _PLUGIN_DIR = Path(__file__).resolve().parent
-for _path in (_PLUGIN_DIR, _PLUGIN_DIR / "core"):
+for _path in (_PLUGIN_DIR, _PLUGIN_DIR / "core", _PLUGIN_DIR.parent):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
