@@ -6,8 +6,6 @@
 - 安装 fastapi + uvicorn + websockets
 - 设置 JINYV_DESKTOP_TOKEN（或 config token）
 """
-from __future__ import annotations
-
 import asyncio
 import json
 from typing import Any
