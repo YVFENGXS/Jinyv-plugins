@@ -11,7 +11,8 @@ from config import DesktopConfig, check_config, load_config
 def run(cfg: DesktopConfig) -> int:
     adapter = StandaloneDesktop(
         core_url=cfg.core_url, core_token=cfg.core_token,
-        token=cfg.token, account=cfg.account, session=cfg.session)
+        token=cfg.token, account=cfg.account, session=cfg.session,
+        core_prefix=cfg.core_prefix)
     probe = adapter.core.health()
     adapter.core_ok = bool(probe.get("ok"))
     if adapter.core_ok:

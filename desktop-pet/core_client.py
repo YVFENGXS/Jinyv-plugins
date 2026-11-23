@@ -14,18 +14,20 @@ import urllib.request
 
 class CoreClient:
     def __init__(self, base_url: str, token: str = "", account: str = "",
-                 session: str = "", timeout: float = 5.0):
+                 session: str = "", timeout: float = 5.0,
+                 path_prefix: str = ""):
         self.base_url = str(base_url or "").rstrip("/")
         self.token = str(token or "").strip()
         self.account = str(account or "").strip()
         self.session = str(session or "").strip()
         self.timeout = float(timeout)
+        self.path_prefix = str(path_prefix or "").rstrip("/")
 
     def _request(self, method: str, path: str, payload: dict | None = None,
                  query: dict | None = None, auth: bool = True) -> dict:
         if not self.base_url:
             return {"ok": False, "error": "core_url 未配置"}
-        url = f"{self.base_url}{path}"
+        url = f"{self.base_url}{self.path_prefix}{path}"
         if query:
             url += "?" + urllib.parse.urlencode(query)
         data = None if payload is None else json.dumps(

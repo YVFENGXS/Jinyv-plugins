@@ -10,7 +10,7 @@ class StandaloneDesktop:
     core_mode = "local"
 
     def __init__(self, *, core_url: str, core_token: str, token: str,
-                 account: str, session: str):
+                 account: str, session: str, core_prefix: str = ""):
         self.core_url = core_url
         self.core_token = core_token
         self.token = token
@@ -20,7 +20,7 @@ class StandaloneDesktop:
         self.core_ok = False
         self.pending_say: list[str] = []
         self.core = CoreClient(core_url, core_token, account=account,
-                               session=session)
+                               session=session, path_prefix=core_prefix)
 
     def new_device_id(self) -> str:
         return protocol.new_id()[:12]
@@ -29,6 +29,6 @@ class StandaloneDesktop:
         return protocol.now_ms()
 
     def handle_text(self, text: str, *, speaker: str = "") -> str:
-        result = self.core.chat(text, speaker=speaker, source="desktop")
+        result = self.core.chat(text, speaker=speaker, source="desk")
         self.core_ok = bool(result.get("ok"))
         return str(result.get("reply") or "")

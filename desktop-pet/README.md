@@ -30,6 +30,10 @@ python standalone.py --core-url http://127.0.0.1:8710 --port 8787
 
 依赖：`fastapi`、`uvicorn`、`websockets`。
 
+环境变量同时认新名和旧名：`JINYV_DESKTOP_*` 与 `RP_DESKTOP_*` / `RP_HOST_*`。
+如果 `RP_HOST_BASE` 指向 QQ 插件的 `http://127.0.0.1:8080`，适配层会自动带上
+`/jinyu` 前缀（对应 `/jinyu/chat`、`/jinyu/health`）；指向独立 host-api 时保持 `/chat`。
+
 协议文档：[docs/desktop-v1.md](docs/desktop-v1.md)。
 
 ## 文件
