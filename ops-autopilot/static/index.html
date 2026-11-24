@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>运维巡检 · 瑾瑜记忆</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>运维巡检</h1>
+    <div class="sub" id="meta">加载中…</div>
+  </header>
+
+  <main>
+    <section class="summary" id="summary"></section>
+    <table>
+      <thead>
+        <tr><th>项</th><th>状态</th><th>详情</th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <h2>最近历史</h2>
+    <ul id="history"></ul>
+  </main>
+
+  <footer>只读巡检 · 发现问题只报警，不自动改库</footer>
+<script src="app.js"></script>
+</body>
+</html>

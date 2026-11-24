@@ -12,6 +12,7 @@ Jinyv-plugins/
 ├── desktop-pet/       # 桌宠服务端适配层（客户端在 Jinyu-pet 仓库）
 ├── video-call/        # 通话记忆适配层（服务在 jinyu-video-call 仓库）
 ├── memory-starmap/    # 记忆星图：只读 RP_DB 的主题聚类可视化
+├── ops-autopilot/     # 运维巡检（observe-only）：只报警不改库
 └── jinyu-memory-dsh/  # DSH JS/cordis 插件源码 + 安装补丁
 ```
 

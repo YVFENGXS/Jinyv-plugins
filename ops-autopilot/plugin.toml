@@ -1,0 +1,10 @@
+[plugin]
+id = "ops-autopilot"
+name = "Ops Autopilot (observe-only)"
+version = "0.1.0"
+kind = "service"
+entry = "server.py"
+description = "只读巡检 RP_DB 与写入者锁，输出状态与历史；只观察不改库，对应 Qingyi 运维自动驾驶里的影子层。"
+requires = ["jinyv_memory"]
+optional_modules = []
+provides = ["ops.health"]
