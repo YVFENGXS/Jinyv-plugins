@@ -1,0 +1,10 @@
+[plugin]
+id = "memory-starmap"
+name = "Memory Star Map"
+version = "0.1.0"
+kind = "service"
+entry = "server.py"
+description = "只读 Jinyv-memory 的 RP_DB，把长期事实、事件卡、记忆单元按主题聚类画成星图。"
+requires = ["jinyv_memory"]
+optional_modules = []
+provides = ["ui.starmap"]

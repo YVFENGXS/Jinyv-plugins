@@ -11,6 +11,7 @@ Jinyv-plugins/
 ├── host-api/          # 宿主 HTTP API 启动器（/chat /remember /recall）
 ├── desktop-pet/       # 桌宠服务端适配层（客户端在 Jinyu-pet 仓库）
 ├── video-call/        # 通话记忆适配层（服务在 jinyu-video-call 仓库）
+├── memory-starmap/    # 记忆星图：只读 RP_DB 的主题聚类可视化
 └── jinyu-memory-dsh/  # DSH JS/cordis 插件源码 + 安装补丁
 ```
 
