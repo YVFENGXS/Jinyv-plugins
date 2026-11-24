@@ -459,7 +459,8 @@
     if (src.error) {
       statsEl.textContent = "库不可用：" + src.error;
     } else {
-      statsEl.textContent = nodes.length + " 条记忆 · " + links.length + " 条关联";
+      statsEl.textContent = (src.scope ? "主私聊 · " : "") +
+        nodes.length + " 条记忆 · " + links.length + " 条关联";
     }
     layout();
     buildBackdrop();

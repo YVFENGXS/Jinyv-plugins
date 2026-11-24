@@ -8,9 +8,10 @@
 数据来源（全部只读）：
   durable_facts / event_cards / memory_units
   库不存在时返回空图，不建库、不写库。
+  默认只看主私聊会话，可用 RP_STARMAP_SESSION 指定（留空表示全部会话）。
 
 用法：
-    python server.py [--port 8712] [--db data/rp_memory.db] [--token 口令]
+    python server.py [--port 8712] [--db data/rp_memory.db] [--token 口令] [--session 会话]
 """
 from __future__ import annotations
 
@@ -24,7 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-CONFIG = {"gate_token": "", "port": 8712, "db": ""}
+CONFIG = {"gate_token": "", "port": 8712, "db": "", "session": ""}
 MAX_NODES = 2000
 
 
@@ -84,7 +85,7 @@ def load_config(path):
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
             if isinstance(data, dict):
-                for key in ("gate_token", "port", "db"):
+                for key in ("gate_token", "port", "db", "session"):
                     if key in data:
                         CONFIG[key] = data[key]
         except Exception as exc:  # noqa: BLE001
@@ -93,6 +94,25 @@ def load_config(path):
 
 def db_path():
     return CONFIG.get("db") or os.environ.get("RP_DB") or os.path.join("data", "rp_memory.db")
+
+
+def detect_main_session():
+    """主私聊：记忆最多的单聊会话（qq-u 开头、不含 # 房间/群后缀）。"""
+    try:
+        data = rows("""select session_id, count(*) as c from durable_facts
+                       where session_id like 'qq-u%' and session_id not like '%#%'
+                       group by session_id order by c desc limit 1""")
+    except sqlite3.Error:
+        return ""
+    return data[0]["session_id"] if data else ""
+
+
+def scope_session():
+    """返回要展示的会话；all / * 表示不限会话。"""
+    wanted = str(CONFIG.get("session") or "").strip()
+    if wanted.lower() in ("all", "*"):
+        return ""
+    return wanted or detect_main_session()
 
 
 def rows(sql, args=()):
@@ -113,13 +133,16 @@ def collect():
         return {"nodes": [], "links": [], "source": {"db": path, "error": "库不存在"}}
 
     per_table = MAX_NODES // 3 + 100
+    scope = scope_session()
+    scope_sql = " and session_id = ?" if scope else ""
+    scope_args = (scope,) if scope else ()
     queries = [
         (
             "facts",
             """select id, fact, tags, importance, category, created_at, supersedes_id
                from durable_facts
-               where retracted_at is null or retracted_at = ''
-               order by id desc limit ?""",
+               where (retracted_at is null or retracted_at = '')%s
+               order by id desc limit ?""" % scope_sql,
             lambda r: (
                 "f:%s" % r["id"],
                 clamp(r.get("fact")),
@@ -133,8 +156,8 @@ def collect():
             "events",
             """select event_id, summary, subject, session_id, importance, created_at, supersedes_id
                from event_cards
-               where retracted_at is null or retracted_at = ''
-               order by rowid desc limit ?""",
+               where (retracted_at is null or retracted_at = '')%s
+               order by rowid desc limit ?""" % scope_sql,
             lambda r: (
                 "e:%s" % r["event_id"],
                 clamp(r.get("summary")),
@@ -148,7 +171,8 @@ def collect():
             "units",
             """select id, content_json, thread_id, bucket_key, salience, created_at, supersedes
                from memory_units
-               order by rowid desc limit ?""",
+               where 1=1%s
+               order by rowid desc limit ?""" % scope_sql,
             lambda r: (
                 "m:%s" % r["id"],
                 content_text(r.get("content_json")),
@@ -163,7 +187,7 @@ def collect():
     rev = {}
     for name, sql, mapping in queries:
         try:
-            data = rows(sql, (per_table,))
+            data = rows(sql, scope_args + (per_table,))
         except sqlite3.Error as exc:
             errors.append("%s: %s" % (name, str(exc)[:80]))
             counts[name] = 0
@@ -184,7 +208,8 @@ def collect():
     nodes = nodes[:MAX_NODES]
     links = build_links(nodes, rev)
     return {"nodes": nodes, "links": links,
-            "source": {"db": path, "counts": counts, "errors": errors}}
+            "source": {"db": path, "scope": scope, "counts": counts,
+                       "errors": errors}}
 
 
 def build_links(nodes, rev):
@@ -269,6 +294,7 @@ def main():
     ap.add_argument("--token", default=None)
     ap.add_argument("--config", default=None)
     ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--session", default=None, help="只画这个会话（all 表示全部）")
     args = ap.parse_args()
 
     load_config(args.config)
@@ -280,14 +306,17 @@ def main():
         CONFIG["port"] = args.port
     else:
         CONFIG["port"] = int(os.environ.get("RP_STARMAP_PORT") or CONFIG.get("port") or 8712)
+    CONFIG["session"] = (args.session if args.session is not None
+                         else os.environ.get("RP_STARMAP_SESSION") or CONFIG["session"])
     CONFIG["gate_token"] = args.token or os.environ.get("RP_STARMAP_TOKEN") or CONFIG["gate_token"]
     if not CONFIG["gate_token"]:
         CONFIG["gate_token"] = secrets.token_urlsafe(12)
         print("开发模式：本次口令 t=%s" % CONFIG["gate_token"])
 
     srv = ThreadingHTTPServer((args.host, CONFIG["port"]), Handler)
-    print("记忆星图：http://%s:%d/?t=%s  库：%s" %
-          (args.host, CONFIG["port"], CONFIG["gate_token"], db_path()))
+    print("记忆星图：http://%s:%d/?t=%s  库：%s  会话：%s" %
+          (args.host, CONFIG["port"], CONFIG["gate_token"], db_path(),
+           scope_session() or "全部"))
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
