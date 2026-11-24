@@ -48,6 +48,18 @@ python server.py --db /path/to/rp_memory.db --port 8712 --token <口令> --host 
 curl -H "X-Gate-Token: $RP_STARMAP_TOKEN" http://127.0.0.1:8712/api/memories | head
 ```
 
+## 导出离线单文件
+
+没有公网入口时，把当前星图打包成一个自带数据的 HTML，手机断网也能打开：
+
+```bash
+curl -H "X-Gate-Token: $RP_STARMAP_TOKEN" \
+  http://127.0.0.1:8712/api/memories > data.json
+python export.py --data data.json --out 记忆星图.html
+```
+
+导出的文件内联了 CSS/JS/数据，不请求任何网络；双击或拷到手机用浏览器打开即可。
+
 ## 注意
 
 - 库不存在时返回空图并在 `source.error` 里说明，不会自动建库。

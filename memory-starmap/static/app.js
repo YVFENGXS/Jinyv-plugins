@@ -204,30 +204,37 @@
     });
   }
 
+  function applyData(data) {
+    nodes = data.nodes || [];
+    var byId = {};
+    nodes.forEach(function (n) { byId[n.id] = n; });
+    links = (data.links || []).map(function (l) {
+      return { _a: byId[l.source], _b: byId[l.target] };
+    });
+    var src = data.source || {};
+    if (src.error) {
+      statsEl.textContent = "库不可用：" + src.error;
+    } else {
+      statsEl.textContent = nodes.length + " 条记忆 · " + links.length + " 条关联";
+    }
+    layout();
+    fit();
+    renderTopics();
+    draw();
+  }
+
   function start() {
+    // 导出的离线单文件把数据内联在 window.__STARMAP_DATA__，不再请求接口
+    if (window.__STARMAP_DATA__) {
+      applyData(window.__STARMAP_DATA__);
+      return;
+    }
     fetch("/api/memories", { headers: { "X-Gate-Token": TOKEN } })
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
       })
-      .then(function (data) {
-        nodes = data.nodes || [];
-        var byId = {};
-        nodes.forEach(function (n) { byId[n.id] = n; });
-        links = (data.links || []).map(function (l) {
-          return { _a: byId[l.source], _b: byId[l.target] };
-        });
-        var src = data.source || {};
-        if (src.error) {
-          statsEl.textContent = "库不可用：" + src.error;
-        } else {
-          statsEl.textContent = nodes.length + " 条记忆 · " + links.length + " 条关联";
-        }
-        layout();
-        fit();
-        renderTopics();
-        draw();
-      })
+      .then(applyData)
       .catch(function (err) {
         statsEl.textContent = "加载失败：" + err.message;
       });
@@ -245,13 +252,48 @@
     draw();
   }, { passive: false });
 
+  // 手机双指缩放：两个触点距离变化折算成缩放，锚点取两指中点
+  var pointers = {};
+  var pinch = null;
+
+  function pinchInfo() {
+    var ids = Object.keys(pointers);
+    if (ids.length < 2) return null;
+    var a = pointers[ids[0]];
+    var b = pointers[ids[1]];
+    return { d: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+             mx: (a.x + b.x) / 2 - innerWidth / 2,
+             my: (a.y + b.y) / 2 - innerHeight / 2 };
+  }
+
   canvas.addEventListener("pointerdown", function (ev) {
+    pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
+    canvas.setPointerCapture(ev.pointerId);
+    var info = pinchInfo();
+    if (info) {
+      pinch = { d: info.d, k: view.k };
+      drag = null;
+      return;
+    }
     drag = { x: ev.clientX, y: ev.clientY, vx: view.x, vy: view.y, moved: false };
     canvas.classList.add("grabbing");
-    canvas.setPointerCapture(ev.pointerId);
   });
 
   canvas.addEventListener("pointermove", function (ev) {
+    if (pointers[ev.pointerId]) {
+      pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
+    }
+    if (pinch) {
+      var info = pinchInfo();
+      if (info) {
+        var k2 = Math.min(6, Math.max(0.15, pinch.k * (info.d / pinch.d)));
+        view.x += info.mx / view.k - info.mx / k2;
+        view.y += info.my / view.k - info.my / k2;
+        view.k = k2;
+        draw();
+      }
+      return;
+    }
     if (drag) {
       var dx = ev.clientX - drag.x;
       var dy = ev.clientY - drag.y;
@@ -273,6 +315,8 @@
   });
 
   canvas.addEventListener("pointerup", function (ev) {
+    delete pointers[ev.pointerId];
+    if (Object.keys(pointers).length < 2) pinch = null;
     canvas.classList.remove("grabbing");
     var wasDrag = drag && drag.moved;
     drag = null;
